@@ -117,15 +117,15 @@ def main():
             sys.stdout.write('\r\t%0.3f million reads processed' % float(read_count/1000000.))
             sys.stdout.flush()
         l_vals = line.strip().split('\t')
-        taxid = l_vals[2]
+        taxid = l_vals[3]
         count = 1
         #If using read length instead of read counts
         if args.use_read_len:
-            if '|' in l_vals[3]:
-                [len1,len2] = l_vals[3].split('|')
+            if '|' in l_vals[4]:
+                [len1,len2] = l_vals[4].split('|')
                 count = int(len1)+int(len2)
             else:
-                count = int(l_vals[3])
+                count = int(l_vals[4])
         #add to dictionaries 
         if taxid not in taxid2counts:
             taxid2counts[taxid] = count
