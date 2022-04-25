@@ -59,33 +59,14 @@ class Tree(object):
         assert isinstance(node,Tree)
         self.children.append(node)
 #################################################################################
-#Main method
-def main():
-    #Parse arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-i','--input', '-k','--kraken', dest='kraken_file', required=True,
-        help='Kraken output file (5 tab-delimited columns, taxid in 3rd column)')
-    parser.add_argument('-t','--taxonomy', dest='tax_file', required=True,
-        help='Output taxonomy file from make_ktaxonomy.py')
-    parser.add_argument('-o','--output',dest='out_file', required=True,
-        help='Output kraken report file')
-    parser.add_argument('--use-read-len',dest='use_read_len',
-        action='store_true',default=False, required=False,
-        help='Make report file using sum of read lengths [default: read counts]')
-    args = parser.parse_args()
-
-    #Start Program
-    time = strftime("%m-%d-%Y %H:%M:%S", gmtime())
-    sys.stdout.write("PROGRAM START TIME: " + time + '\n')
-
-    #STEP 1/4: READ TAXONOMY FILE  
+def read_taxonomy_file(tax_file):
     count_nodes = 0
-    sys.stdout.write(">> STEP 1/4: Reading taxonomy %s...\n" % args.tax_file)
+    sys.stdout.write(">> STEP 1/4: Reading taxonomy %s...\n" % tax_file)
     sys.stdout.write("\t%i nodes saved" % (count_nodes))
     #Parse taxonomy file 
     root_node = -1
     taxid2node = {}
-    t_file = open(args.tax_file,'r')
+    t_file = open(tax_file,'r')
     for line in t_file:
         count_nodes += 1
         sys.stdout.write("\r\t%i nodes saved" % (count_nodes))
@@ -102,15 +83,17 @@ def main():
     t_file.close()
     sys.stdout.write("\r\t%i nodes saved\n" % (count_nodes))
     sys.stdout.flush()
-    #STEP 2/4: READ KRAKEN FILE FOR COUNTS PER TAXID
+    return taxid2node, root_node
+
+def read_kraken_file(kraken_file, use_read_len=False):
     read_count = 0
-    sys.stdout.write(">> STEP 2/4: Reading kraken file %s...\n" % args.kraken_file)
+    sys.stdout.write(">> STEP 2/4: Reading kraken file %s...\n" % kraken_file)
     sys.stdout.write("\t%i million reads processed" % read_count)
     sys.stdout.flush()
     #Save counts per taxid
     taxid2counts = {}
     taxid2allcounts = {} 
-    k_file = open(args.kraken_file,'r')
+    k_file = open(kraken_file,'r')
     for line in k_file:
         read_count += 1
         if read_count % 1000 == 0:
@@ -120,7 +103,7 @@ def main():
         taxid = l_vals[3]
         count = 1
         #If using read length instead of read counts
-        if args.use_read_len:
+        if use_read_len:
             if '|' in l_vals[4]:
                 [len1,len2] = l_vals[4].split('|')
                 count = int(len1)+int(len2)
@@ -136,7 +119,9 @@ def main():
     k_file.close()
     sys.stdout.write('\r\t%0.3f million reads processed\n' % float(read_count/1000000.))
     sys.stdout.flush()
-    #STEP 3/4: FOR EVERY TAXID PARSED, ADD UP TOTAL READS
+    return taxid2counts, taxid2allcounts, read_count
+
+def final_tree(taxid2counts,taxid2node,taxid2allcounts):
     sys.stdout.write(">> STEP 3/4: Creating final tree...\n")
     for curr_tid in taxid2counts:
         #Skip unclassified
@@ -157,9 +142,11 @@ def main():
             p_node.all_reads += add_counts
             #Get next parent node
             p_node = p_node.parent
-    #STEP 4/4: PRINT REPORT FILE 
-    sys.stdout.write(">> STEP 4/4: Printing report file to %s...\n" % args.out_file)
-    o_file = open(args.out_file,'w')
+    return taxid2counts,taxid2node,taxid2allcounts
+
+def write_output(out_file,taxid2counts,taxid2allcounts,read_count, root_node):
+    sys.stdout.write(">> STEP 4/4: Printing report file to %s...\n" % out_file)
+    o_file = open(out_file,'w')
     #Write line for unclassified reads:
     if '0'  in taxid2counts:
         o_file.write("%6.2f\t" % (float(taxid2counts['0'])/float(read_count)*100))
@@ -189,6 +176,36 @@ def main():
             #Add to list 
             parse_nodes.insert(0,child)    
     o_file.close() 
+
+#Main method
+def main():
+    #Parse arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-i','--input', '-k','--kraken', nargs='+', dest='kraken_list', required=True,
+        help='Kraken output file (5 tab-delimited columns, taxid in 3rd column)')
+    parser.add_argument('-t','--taxonomy', dest='tax_file', required=True,
+        help='Output taxonomy file from make_ktaxonomy.py')
+    parser.add_argument('-o','--output',dest='out_file', required=True,
+        help='Output kraken report file')
+    parser.add_argument('--use-read-len',dest='use_read_len',
+        action='store_true',default=False, required=False,
+        help='Make report file using sum of read lengths [default: read counts]')
+    args = parser.parse_args()
+
+    #Start Program
+    time = strftime("%m-%d-%Y %H:%M:%S", gmtime())
+    sys.stdout.write("PROGRAM START TIME: " + time + '\n')
+
+    #STEP 1/4: READ TAXONOMY FILE  
+    taxid2node, root_node = read_taxonomy_file(args.tax_file)
+    #STEP 2/4: READ KRAKEN FILE FOR COUNTS PER TAXID
+    for kraken_file in args.kraken_list:
+        taxid2counts, taxid2allcounts, read_count = read_kraken_file(args.kraken_file,args.use_read_len)
+        #STEP 3/4: FOR EVERY TAXID PARSED, ADD UP TOTAL READS
+        taxid2counts, taxid2node, taxid2allcounts = final_tree(taxid2counts,taxid2node,taxid2allcounts)
+        #STEP 4/4: PRINT REPORT FILE
+        out_file = f'kraken_report_{kraken_file}' 
+        write_output(out_file,taxid2counts=taxid2counts,taxid2allcounts=taxid2allcounts ,read_count=read_count, root_node=root_node)
     #End of program
     time = strftime("%m-%d-%Y %H:%M:%S", gmtime())
     sys.stdout.write("PROGRAM END TIME: " + time + '\n')
