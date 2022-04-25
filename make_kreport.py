@@ -200,7 +200,8 @@ def main():
     taxid2node, root_node = read_taxonomy_file(args.tax_file)
     #STEP 2/4: READ KRAKEN FILE FOR COUNTS PER TAXID
     for kraken_file in args.kraken_list:
-        taxid2counts, taxid2allcounts, read_count = read_kraken_file(args.kraken_file,args.use_read_len)
+        print(f'processing {kraken_file}')
+        taxid2counts, taxid2allcounts, read_count = read_kraken_file(kraken_file,args.use_read_len)
         #STEP 3/4: FOR EVERY TAXID PARSED, ADD UP TOTAL READS
         taxid2counts, taxid2node, taxid2allcounts = final_tree(taxid2counts,taxid2node,taxid2allcounts)
         #STEP 4/4: PRINT REPORT FILE
