@@ -185,8 +185,6 @@ def main():
         help='Kraken output file (5 tab-delimited columns, taxid in 3rd column)')
     parser.add_argument('-t','--taxonomy', dest='tax_file', required=True,
         help='Output taxonomy file from make_ktaxonomy.py')
-    parser.add_argument('-o','--output',dest='out_file', required=True,
-        help='Output kraken report file')
     parser.add_argument('--use-read-len',dest='use_read_len',
         action='store_true',default=False, required=False,
         help='Make report file using sum of read lengths [default: read counts]')
@@ -205,7 +203,7 @@ def main():
         #STEP 3/4: FOR EVERY TAXID PARSED, ADD UP TOTAL READS
         taxid2counts, taxid2node, taxid2allcounts = final_tree(taxid2counts,taxid2node,taxid2allcounts)
         #STEP 4/4: PRINT REPORT FILE
-        out_file = f'kraken_report_{kraken_file}' 
+        out_file =  f'kraken_report_{os.path.basename(kraken_file)}' 
         write_output(out_file,taxid2counts=taxid2counts,taxid2allcounts=taxid2allcounts ,read_count=read_count, root_node=root_node)
     #End of program
     time = strftime("%m-%d-%Y %H:%M:%S", gmtime())
